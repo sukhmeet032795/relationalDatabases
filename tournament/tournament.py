@@ -2,10 +2,14 @@ import psycopg2
 import bleach
 
 
-def connect():
+def connect(database_name="tournament"):
     """Connect to the PostgreSQL database.  Returns a database connection."""
-    return psycopg2.connect("dbname=tournament")
-
+    try:
+        db = psycopg2.connect("dbname={}".format(database_name))
+        cursor = db.cursor()
+        return db, cursor
+    except:
+        print("Could Not Connect With %s Database", (database_name,))
 
 def deleteMatches():
     """Remove all the match records from the database."""
@@ -19,8 +23,7 @@ def deletePlayers():
 
 def deleteRecords(tableName):
     # Establish connection
-    conn = connect()
-    c = conn.cursor()
+    conn, c = connect()
 
     # Execute deletion query
     query = "DELETE FROM " + tableName
@@ -34,8 +37,7 @@ def deleteRecords(tableName):
 def countPlayers():
     """Returns the number of players currently registered."""
     # Establish connection
-    conn = connect()
-    c = conn.cursor()
+    conn, c = connect()
 
     # Execute count query
     query = "SELECT COUNT(*) AS num FROM players"
@@ -57,17 +59,18 @@ def registerPlayer(name):
     Args:
       name: the player's full name (need not be unique).
     """
+
     # Establish connection
-    conn = connect()
-    c = conn.cursor()
+    db, cursor = connect()
 
     # Execute insertion query with sanitised input
-    c.execute("INSERT INTO players (name) values (%s)",
-             (bleach.clean(name),))
+    query = "INSERT INTO players (name) VALUES (%s);"
+    parameter = (bleach.clean(name),)
+    cursor.execute(query, parameter)
 
     # Commit changes and close connection
-    conn.commit()
-    conn.close()
+    db.commit()
+    db.close()
 
 
 def playerStandings():
@@ -82,18 +85,11 @@ def playerStandings():
         matches: the number of matches the player has played
     """
     # Establish connection
-    conn = connect()
-    c = conn.cursor()
+    conn, c = connect()
 
     # Execute standings retrieval query
     query = """
-            SELECT noofwins.player_id,
-                   name,
-                   wins,
-                   (wins + losses) AS matches
-              FROM noofwins, nooflosses
-              WHERE noofwins.player_id = nooflosses.player_id
-              ORDER BY wins DESC
+            SELECT * from standings
             """
     c.execute(query)
 
@@ -118,12 +114,12 @@ def reportMatch(winner, loser):
       loser:  the id number of the player who lost
     """
     # Establish connection
-    conn = connect()
-    c = conn.cursor()
+    conn, c = connect()
 
     # Execute insertion query
-    c.execute("INSERT INTO matches (winner_id, loser_id) VALUES (%s, %s)",
-             (bleach.clean(winner), bleach.clean(loser), ))
+    query = "INSERT INTO matches (winner_id, loser_id) VALUES (%s, %s);"
+    parameter = (bleach.clean(winner), bleach.clean(loser),)
+    c.execute(query, parameter)
 
     # Commit changes and close connection
     conn.commit()
